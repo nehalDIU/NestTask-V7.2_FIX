@@ -5,8 +5,8 @@ import { Analytics } from '@vercel/analytics/react';
 import './index.css';
 import { LoadingScreen } from './components/LoadingScreen';
 import { initPWA } from './utils/pwa';
-import { prefetchResources, prefetchAsset, prefetchApiData } from './utils/prefetch';
-import { STORES } from './utils/offlineStorage';
+// Import the STORES constant directly
+import { DB_NAME, DB_VERSION, STORES } from './utils/offlineStorage';
 
 // Performance optimizations initialization
 const startTime = performance.now();
@@ -29,135 +29,37 @@ const pwaPromise = Promise.resolve().then(() => {
   }, 1000);
 });
 
-// Enhanced prefetch for resources with priority marking
+// Simplified prefetch for critical resources
 const prefetchCriticalResources = () => {
   if (navigator.onLine) {
-    // Define critical resources with priority
-    const criticalResources = [
-      { 
-        type: 'asset' as const, 
-        key: 'manifest', 
-        loader: '/manifest.json',
-        options: { priority: 'high' as const }
-      },
-      { 
-        type: 'asset' as const, 
-        key: 'icon', 
-        loader: '/icons/icon-192x192.png',
-        options: { priority: 'high' as const }
-      },
-      { 
-        type: 'route' as const, 
-        key: 'auth', 
-        loader: () => import('./pages/AuthPage'),
-        options: { priority: 'high' as const }
-      },
-      // API data prefetching for the most important data
-      { 
-        type: 'api' as const, 
-        key: 'tasks', 
-        loader: {
-          tableName: 'tasks',
-          queryFn: (query: any) => query.select('*').limit(10),
-          storeName: STORES.TASKS
-        },
-        options: { priority: 'high' as const }
-      },
-      { 
-        type: 'api' as const, 
-        key: 'routines', 
-        loader: {
-          tableName: 'routines',
-          queryFn: (query: any) => query.select('*').eq('is_active', true).limit(1),
-          storeName: STORES.ROUTINES
-        },
-        options: { priority: 'high' as const }
-      }
-    ];
+    console.debug('Prefetching critical resources...');
     
-    // Prefetch all critical resources in parallel with priority
-    prefetchResources(criticalResources);
-  }
-};
-
-// Optimize connection to the server
-const establishConnectionOptimizations = () => {
-  // Use connection preload hints
-  const domains = [
-    import.meta.env.VITE_SUPABASE_URL || '',
-    'https://fonts.googleapis.com',
-    'https://fonts.gstatic.com'
-  ];
-  
-  domains.forEach(domain => {
-    if (!domain) return;
+    // Prefetch main assets
+    const iconUrl = '/icons/icon-192x192.png';
+    fetch(iconUrl).catch(err => console.debug('Prefetch error:', err));
     
-    try {
-      const url = new URL(domain);
-      // DNS prefetch
-      const dnsPrefetch = document.createElement('link');
-      dnsPrefetch.rel = 'dns-prefetch';
-      dnsPrefetch.href = url.origin;
-      document.head.appendChild(dnsPrefetch);
-      
-      // Preconnect for faster initial connection
-      const preconnect = document.createElement('link');
-      preconnect.rel = 'preconnect';
-      preconnect.href = url.origin;
-      preconnect.crossOrigin = 'anonymous';
-      document.head.appendChild(preconnect);
-      
-      console.debug(`Connection optimization applied for ${url.origin}`);
-    } catch (err) {
-      console.error('Error setting up connection optimization:', err);
-    }
-  });
-  
-  // Optimize bandwidth usage with priority fetch
-  if ('fetch' in window) {
-    const originalFetch = window.fetch;
-    
-    // Enhanced fetch with priority hints
-    window.fetch = function (input, init) {
-      // Automatically add a cache buster to avoid stale data
-      if (typeof input === 'string' && !input.includes('?_cb=')) {
-        const url = new URL(input, window.location.origin);
-        url.searchParams.set('_cb', Date.now().toString());
-        input = url.toString();
-      }
-      
-      // Enhanced options with priority hints
-      const enhancedInit = {
-        ...init,
-        // Add modern browser fetch priority hints when supported
-        priority: init?.priority || 'auto',
-      };
-      
-      return originalFetch.call(window, input, enhancedInit);
-    };
+    // Prefetch important routes
+    import('./pages/AuthPage').catch(err => console.debug('Route prefetch error:', err));
   }
 };
 
 // Initialize optimizations in parallel - critical path first
 Promise.resolve()
   .then(() => {
-    // First tackle the connection optimizations
-    establishConnectionOptimizations();
-    
-    // Then start prefetching critical resources
-    prefetchCriticalResources();
+    // Simplified connection optimizations - using type assertion for the navigator.connection API
+    const nav = navigator as any;
+    if (nav.connection && 'saveData' in nav.connection && nav.connection.saveData) {
+      // Skip prefetching for users with data saver enabled
+      console.debug('Data saver mode detected, skipping prefetch');
+    } else {
+      // Start prefetching critical resources
+      setTimeout(prefetchCriticalResources, 1000);
+    }
     
     // Then handle PWA initialization
     return pwaPromise;
   })
-  .catch(console.error)
-  .finally(() => {
-    // Performance measurement
-    performance.measure('app-optimizations', 'app-init-start');
-    performance.getEntriesByName('app-optimizations').forEach(entry => {
-      console.debug(`Optimizations completed in ${entry.duration.toFixed(2)}ms`);
-    });
-  });
+  .catch(console.error);
 
 // Get the root element with null check
 const rootElement = document.getElementById('root');

@@ -7,7 +7,7 @@
     <meta name="description" content="NestTask - A modern task management application for teams and individuals" />
     
     <!-- Resource hints for faster loading -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://supabase.io" crossorigin />
     <link rel="preconnect" href="https://api.supabase.co" crossorigin />
@@ -16,17 +16,12 @@
     <link rel="dns-prefetch" href="https://api.supabase.co" />
 
     <!-- Preload critical assets with priority hints -->
-    <link rel="preload" href="/icons/icon-192x192.png" as="image" fetchpriority="high" crossorigin="anonymous" />
-    <link rel="preload" href="/manifest.json" as="fetch" fetchpriority="high" crossorigin="anonymous" />
-    <link rel="preload" href="/index.css" as="style" fetchpriority="high" crossorigin="anonymous" />
-    <link rel="modulepreload" href="/src/main.tsx" as="script" fetchpriority="high" crossorigin="anonymous" />
-    
-    <!-- Preload critical fonts -->
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" as="style" crossorigin="anonymous" />
+    <link rel="preload" href="/icons/icon-192x192.png" as="image" fetchpriority="high" />
+    <link rel="preload" href="/index.css" as="style" fetchpriority="high" />
     
     <!-- PWA assets -->
     <link rel="icon" type="image/svg+xml" href="/icons/icon-192x192.png" />
-    <link rel="manifest" href="/manifest.json" crossorigin="use-credentials" />
+    <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
     
     <!-- Critical CSS inline for faster paint -->
@@ -127,69 +122,26 @@
         });
       }
       
-      // Cache warming function
-      function warmCache() {
-        if ('caches' in window) {
-          // Warm up API routes that will be needed immediately
-          caches.open('api-responses-v2').then(cache => {
-            // Prefetch critical API data
-            if (navigator.onLine) {
-              const authStatus = fetch('/api/auth/status', { method: 'GET', credentials: 'same-origin' })
-                .then(response => {
-                  if (response.ok) {
-                    cache.put('/api/auth/status', response.clone());
-                  }
-                  return response;
-                })
-                .catch(() => {});
-            }
-          });
-        }
-      }
-      
-      // Instant loading optimizations - start early execution
+      // Hide loading screen when React is initialized
       document.addEventListener('DOMContentLoaded', () => {
-        // Start important requests early
-        const earlyPrefetch = () => {
-          try {
-            // Detect supported features for instant loading
-            const supportsDataCache = 'caches' in window;
-            const supportsIdleCallback = 'requestIdleCallback' in window;
-            
-            // Add priority hints to the main render
-            if (navigator.connection && navigator.connection.effectiveType === '4g') {
-              // For high-speed connections, aggressively preload
-              const criticalLinks = document.querySelectorAll('link[rel="preload"]');
-              criticalLinks.forEach(link => {
-                link.setAttribute('fetchpriority', 'high');
-              });
+        // Wait a short time to ensure React has started rendering
+        setTimeout(() => {
+          const rootEl = document.getElementById('root');
+          if (rootEl && rootEl.childNodes.length > 0) {
+            const loadingEl = document.querySelector('.loading');
+            if (loadingEl) {
+              loadingEl.remove();
             }
-            
-            if (supportsIdleCallback) {
-              // Delayed less-important operations
-              window.requestIdleCallback(() => {
-                warmCache();
-              }, { timeout: 2000 });
-            } else {
-              // Fallback for browsers without idle callback
-              setTimeout(warmCache, 1000);
-            }
-          } catch (err) {
-            console.warn('Error in early prefetching:', err);
+          } else {
+            // If React hasn't rendered yet, check again in a moment
+            setTimeout(() => {
+              const loadingEl = document.querySelector('.loading');
+              if (loadingEl) {
+                loadingEl.remove();
+              }
+            }, 1000);
           }
-        };
-        
-        // Start early optimization
-        earlyPrefetch();
-        
-        // Remove loading screen when React is initialized
-        const rootEl = document.getElementById('root');
-        if (rootEl && rootEl.childNodes.length > 0) {
-          const loadingEl = document.querySelector('.loading');
-          if (loadingEl) {
-            loadingEl.remove();
-          }
-        }
+        }, 500);
       });
     </script>
   </body>
