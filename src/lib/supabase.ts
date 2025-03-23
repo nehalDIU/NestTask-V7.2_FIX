@@ -154,6 +154,16 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     headers: {
       'X-Client-Info': 'nesttask@1.0.0',
       'Cache-Control': 'no-cache'
+    },
+    // Add request interceptor to handle common errors
+    fetch: (url, options) => {
+      return fetch(url, options).then(response => {
+        if (response.status === 403) {
+          console.warn('403 Forbidden error detected - may need to refresh authentication');
+          // Optionally trigger auth refresh here if needed
+        }
+        return response;
+      });
     }
   },
   db: {
@@ -244,7 +254,57 @@ setTimeout(() => {
   testConnection().catch(console.error);
 }, 1000);
 
+// Set up auth state change listener to monitor session status
+supabase.auth.onAuthStateChange((event, session) => {
+  console.log(`Auth state changed: ${event}`, session ? 'Session exists' : 'No session');
+  
+  if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+    console.log('Auth tokens updated');
+  }
+  
+  // For debugging permissions issues
+  if (session) {
+    console.log('Current user role:', session.user?.user_metadata?.role);
+  }
+});
+
 // Export additional utility for checking connection status
 export function getConnectionStatus() {
   return { isInitialized, connectionAttempts };
+}
+
+// Utility to check authentication status and refresh if needed
+export async function checkAndRefreshAuth() {
+  try {
+    // Get current session
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      console.warn('No active session found');
+      return false;
+    }
+    
+    // Check if session expired or will expire soon (within 5 minutes)
+    const expiresAt = session.expires_at;
+    const now = Math.floor(Date.now() / 1000);
+    const fiveMinutes = 5 * 60;
+    
+    if (expiresAt && expiresAt < now + fiveMinutes) {
+      console.log('Session expiring soon, refreshing token');
+      const { data, error } = await supabase.auth.refreshSession();
+      
+      if (error) {
+        console.error('Failed to refresh session:', error);
+        return false;
+      }
+      
+      console.log('Session refreshed successfully');
+      return !!data.session;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error checking auth status:', error);
+    return false;
+  }
 }

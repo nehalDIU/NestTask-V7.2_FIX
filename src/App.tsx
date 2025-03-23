@@ -29,6 +29,7 @@ import type { User } from './types/user';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { supabase } from './lib/supabase';
 import { preloadPredictedRoutes } from './utils/routePreloader';
+import { toast } from 'react-hot-toast';
 
 // Page import functions for prefetching
 const importAdminDashboard = () => import('./pages/AdminDashboard').then(module => ({ default: module.AdminDashboard }));
@@ -177,10 +178,33 @@ export default function App() {
       }
     });
     
+    // Add global error handler for Supabase 403 errors
+    const handleGlobalErrors = (event: Event | ErrorEvent) => {
+      if (event instanceof ErrorEvent && 
+          event.message.includes('403') && 
+          event.message.includes('supabase')) {
+        console.error('Supabase authorization error detected:', event.message);
+        
+        // Show error toast
+        toast.error('Authorization error. Please sign out and log in again.', {
+          position: 'bottom-right',
+          duration: 5000
+        });
+        
+        // Optionally force a refresh of the auth token
+        import('./lib/supabase').then(({ checkAndRefreshAuth }) => {
+          checkAndRefreshAuth().catch(console.error);
+        });
+      }
+    };
+    
+    window.addEventListener('error', handleGlobalErrors);
+    
     return () => {
       clearTimeout(timer);
       subscription.unsubscribe();
       window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('error', handleGlobalErrors);
     };
   }, [checkHashForRecovery]);
 

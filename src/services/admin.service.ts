@@ -1,9 +1,12 @@
-import { supabase } from '../lib/supabase';
+import { supabase, checkAndRefreshAuth } from '../lib/supabase';
 import type { User } from '../types/auth';
 import type { UserStats } from '../types/user';
 
 export async function isAdmin(): Promise<boolean> {
   try {
+    // Check and refresh authentication if needed
+    await checkAndRefreshAuth();
+    
     const { data: { user } } = await supabase.auth.getUser();
     return user?.user_metadata?.role === 'admin';
   } catch (error) {
@@ -14,6 +17,9 @@ export async function isAdmin(): Promise<boolean> {
 
 export async function fetchAdminUsers(): Promise<User[]> {
   try {
+    // Check and refresh authentication if needed
+    await checkAndRefreshAuth();
+    
     if (!await isAdmin()) {
       return [];
     }

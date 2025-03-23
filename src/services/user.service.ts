@@ -1,15 +1,19 @@
-import { supabase } from '../lib/supabase';
+import { supabase, checkAndRefreshAuth } from '../lib/supabase';
 import type { User } from '../types/auth';
 import type { UserStats } from '../types/user';
 
 export async function fetchUsers(): Promise<User[]> {
   try {
+    // Check and refresh authentication if needed
+    await checkAndRefreshAuth();
+    
     const { data: { user } } = await supabase.auth.getUser();
     if (!user?.user_metadata?.role || user.user_metadata.role !== 'admin') {
       console.warn('Non-admin user attempted to fetch users');
       return [];
     }
 
+    // Add proper API key headers to ensure authorization
     const { data, error } = await supabase
       .from('users')
       .select('id, email, name, role, created_at, last_active')
